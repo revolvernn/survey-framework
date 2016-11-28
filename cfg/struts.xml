@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE struts PUBLIC
+	"-//Apache Software Foundation//DTD Struts Configuration 2.3//EN"
+	"http://struts.apache.org/dtds/struts-2.3.dtd">
+
+<struts>
+
+	<!-- 设置全局国际化资源文件 -->
+	<constant name="struts.custom.i18n.resources" value="i18n" />
+	<!-- <constant name="struts.ognl.allowStaticMethodAccess" value="true"/> -->
+
+	<!-- <constant name="struts.devMode" value="true" /> -->
+	<constant name="struts.ui.theme" value="simple" />
+	<constant name="struts.multipart.maxSize" value="2097152" />
+
+
+	<package name="basePackage" namespace="/" extends="jfreechart-default,json-default">
+		<interceptors>
+			<!-- 注册自定义拦截器类 -->
+			<interceptor name="generateResourceInterceptor"
+				class="com.revolver.survey.admin.component.interceptor.GenerateResourceInterceptor" />
+			<interceptor name="authorityInterceptor"
+				class="com.revolver.survey.admin.component.interceptor.AuthorityInterceptor" />
+			<interceptor name="vIPInterceptor"
+				class="com.revolver.survey.admin.component.interceptor.VIPInterceptor" />
+			<interceptor name="loginInterceptor"
+				class="com.revolver.survey.guest.component.interceptor.LoginInterceptor" />
+			<interceptor-stack name="myStack">
+				<!-- 引用自定义拦截器 -->
+				<!-- <interceptor-ref name="loginInterceptor" /> -->
+				<interceptor-ref name="generateResourceInterceptor" />
+				<interceptor-ref name="authorityInterceptor" />
+				<interceptor-ref name="vIPInterceptor" />
+				<!-- 引用Struts2拦截器 -->
+				<interceptor-ref name="paramsPrepareParamsStack">
+					<!-- 禁用Prepare方法 -->
+					<param name="prepare.alwaysInvokePrepare">false</param>
+
+					<!-- 设置上传文件总大小 -->
+					<param name="fileUpload.maximumSize">2097152</param>
+
+					<!-- 设置上传文件类型 -->
+					<param name="fileUpload.allowedTypes">image/jpeg,image/gif,image/png,image/bmp</param>
+				</interceptor-ref>
+			</interceptor-stack>
+		</interceptors>
+
+		<!-- 引用当前自定义拦截器栈 -->
+		<default-interceptor-ref name="myStack" />
+
+		<!-- 全局result设置 -->
+		<global-results>
+			<result name="loginError">/guestPages/user_login.jsp</result>
+			<result name="toRefill_VIP">/guestPages/user_vip.jsp</result>
+			<result name="toAdminLoginPage">/adminPages/admin_login.jsp</result>
+			<result name="toDesignPage" type="redirectAction">SurveyAction_design?surveyId=${surveyId}
+			</result>
+			<result name="toSurveyAction_top10" type="redirectAction">SurveyAction_top10
+			</result>
+			<result name="toShowSummaryAction" type="redirectAction">StatisticsAction_showSummary?surveyId=${surveyId}
+			</result>
+			<result name="error">/error/error_message.jsp</result>
+			<result name="globalErrMsg">/error/error_message.jsp</result>
+			<result name="input">${inputPath}</result>
+		</global-results>
+
+		<global-exception-mappings>
+			<exception-mapping result="error"
+				exception="com.revolver.survey.e.CatchDelSurveyException" />
+			<exception-mapping result="error"
+				exception="com.revolver.survey.e.CatchDelBagException" />
+			<exception-mapping result="error"
+				exception="com.revolver.survey.e.CatchDelRoleException" />
+			<exception-mapping result="error"
+				exception="com.revolver.survey.e.CatchDelAuthorityException" />
+			<exception-mapping result="error"
+				exception="com.revolver.survey.e.CatchDelAdminException" />
+		</global-exception-mappings>
+	</package>
+
+	<package name="default-1" namespace="/Admin" extends="basePackage">
+		
+		<action name="LogAction_showLogs" class="logAction" method="showLogs">
+			<result name="toShowLogs">/adminPages/log_list.jsp</result>
+		</action>
+		
+		<action name="RoleAction_*" class="roleAction" method="{1}">
+			<result name="toCreatePage">/adminPages/role_create.jsp</result>
+			<result name="toShowRolesPage">/adminPages/role_list.jsp</result>
+			<result name="toShowRolesAction" type="redirectAction">RoleAction_showRoles</result>
+			<result name="toAuthManagerPage">/adminPages/role_authManager.jsp</result>
+			<result name="updateSuccess" type="json">
+    			<param name="root">message</param>
+    		</result>
+		</action>
+		
+		<action name="AuthorityAction_*" class="authorityAction" method="{1}">
+			<result name="toCreatePage">/adminPages/authority_create.jsp</result>
+			<result name="toAuthListPage">/adminPages/authority_list.jsp</result>
+			<result name="toshowAuthAction" type="redirectAction">AuthorityAction_showAuthorities</result>
+			<result name="updateSuccess" type="json">
+    			<param name="root">message</param>
+    		</result>
+			<result name="toResMngPage">/adminPages/authority_resManager.jsp</result>
+		</action>
+		
+		<action name="ResourceAction_*" class="resourceAction" method="{1}">
+			<result name="toAllResListPage">/adminPages/resource_list.jsp</result>
+			<result name="toShowAllResourcesAction" type="redirectAction">ResourceAction_showAllResources</result>
+			<result name="updateSuccess" type="json">
+    			<param name="root">message</param>
+    		</result>
+		</action>	
+		
+		<action name="ExcelAction_*" class="excelAction" method="{1}">
+			<result name="toExportExlPage">/adminPages/survey_list.jsp</result>
+
+			<result name="exportExcelStream" type="stream">
+				<param name="contentDisposition">attachment;filename=${fileName}</param>
+				<param name="contentType">application/vnd.ms-excel</param>
+			</result>
+		</action>
+
+		<action name="AdminAction_*" class="adminAction" method="{1}">
+			<result name="toAdminMainPage">/adminPages/admin_main.jsp</result>
+			<result name="input">/adminPages/admin_login.jsp</result>
+			<result name="toIndexPage">/index.jsp</result>
+			<result name="toShowAdminPage">/adminPages/admin_list.jsp</result>
+			<result name="toShowAdminsAction" type="redirectAction">AdminAction_showAdmins</result>
+			<result name="toRoleManagerPage">/adminPages/admin_roleManager.jsp</result>
+			<result name="updateSuccess" type="json">
+    			<param name="root">message</param>
+    		</result>
+		</action>
+	</package>
+
+	<package name="default" namespace="/Guest" extends="basePackage">
+
+		<action name="ToPageAction_*">
+			<result>/guestPages/{1}.jsp</result>
+		</action>
+
+		<action name="StatisticsAction_*" class="statisticsAction"
+			method="{1}">
+			<result name="toChartResult" type="chart">
+				<param name="height">${height}</param>
+				<param name="width">${width}</param>
+			</result>
+			<result name="toShowSummary">/guestPages/survey_summary.jsp</result>
+			<result name="toTextListPage">/guestPages/statistics_showTextList.jsp</result>
+			<result name="toNormalMatrixPage">/guestPages/statistics_normalMatrix.jsp</result>
+		</action>
+
+		<action name="EngageAction_*" class="engageAction" method="{1}">
+			<result name="toEngageAnswerPage">/guestPages/engage_answerPage.jsp</result>
+			<result name="toFindAllAvailableSurveyPage">/guestPages/survey_findAllAvailableSurvey.jsp
+			</result>
+		</action>
+
+		<action name="QuestionAction_*" class="questionAction" method="{1}">
+			<result name="toTypeChosenPage">/guestPages/question_typeChosenPage.jsp</result>
+			<result name="toQuestionDesignPage">/guestPages/question_design.jsp</result>
+		</action>
+
+		<action name="BagAction_*" class="bagAction" method="{1}">
+			<result name="toEditBagPage">/guestPages/survey_editBag.jsp
+			</result>
+			<result name="toCopyOrMoveMessagePage">/guestPages/copyOrMove_message.jsp</result>
+		</action>
+
+		<action name="SurveyAction_*" class="surveyAction" method="{1}">
+			<result name="toMyUncompletedAction" type="redirectAction">SurveyAction_myUncompleted
+			</result>
+			<result name="toUncompletedListPage">/guestPages/survey_uncompletedListPage.jsp
+			</result>
+			<result name="toCompletedListPage">/guestPages/survey_completedListPage.jsp</result>
+			<result name="toEditSurveyPage">/guestPages/survey_edit.jsp</result>
+			<result name="toDesignPage">/guestPages/survey_design.jsp</result>
+			<result name="toSurveyCmpletedPage">/guestPages/survey_completed.jsp</result>
+			<result name="toAdjustBagOrderPage">/guestPages/survey_adjustBagOrderDesign.jsp
+			</result>
+			<result name="toMoveOrCopyPage">/guestPages/survey_moveOrCopyPage.jsp</result>
+			<result name="toTop10Page">/guestPages/survey_top10.jsp</result>
+			<result name="toMyEngageSurveyPage">/guestPages/survey_myEngageSurvey.jsp</result>
+		</action>
+
+		<action name="UserAction_*" class="userAction" method="{1}">
+			<result name="registSuccess">/guestPages/user_login.jsp</result>
+			<result name="registError">/guestPages/user_regist.jsp</result>
+			<result name="loginSuccess">/index.jsp</result>
+			<result name="logout">/index.jsp</result>
+			<result name="success">/guestPages/user_myCenter.jsp</result>
+			<result name="doVIPError">/guestPages/user_pay.jsp</result>
+		</action>
+	</package>
+
+</struts>

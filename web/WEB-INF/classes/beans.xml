@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:c="http://www.springframework.org/schema/c"
+	xmlns:cache="http://www.springframework.org/schema/cache"
+	xmlns:jdbc="http://www.springframework.org/schema/jdbc"
+	xmlns:jee="http://www.springframework.org/schema/jee"
+	xmlns:lang="http://www.springframework.org/schema/lang"
+	xmlns:p="http://www.springframework.org/schema/p"
+	xmlns:task="http://www.springframework.org/schema/task"
+	xmlns:util="http://www.springframework.org/schema/util"
+	xsi:schemaLocation="http://www.springframework.org/schema/lang http://www.springframework.org/schema/lang/spring-lang-4.0.xsd
+		http://www.springframework.org/schema/jee http://www.springframework.org/schema/jee/spring-jee-4.0.xsd
+		http://www.springframework.org/schema/jdbc http://www.springframework.org/schema/jdbc/spring-jdbc-4.0.xsd
+		http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.0.xsd
+		http://www.springframework.org/schema/task http://www.springframework.org/schema/task/spring-task-4.0.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-4.0.xsd
+		http://www.springframework.org/schema/cache http://www.springframework.org/schema/cache/spring-cache-4.0.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.0.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.0.xsd">
+
+	<!-- 基于注解方式声明Bean对象,设置扫描的包 -->
+	<context:component-scan base-package="com.revolver.survey.*.component"/>
+	
+	<!-- 将外部属性资源文件加载到Spring运行环境中 -->
+	<context:property-placeholder location="classpath:db.properties"/>
+
+	<bean id="dataSource_even" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+		<property name="jdbcUrl" value="${jdbc.jdbcUrl1}"></property>
+		<property name="driverClass" value="${jdbc.driverClass}"></property>
+		<property name="user" value="${jdbc.user}"></property>
+		<property name="password" value="${jdbc.password}"></property>
+		<property name="initialPoolSize" value="${jdbc.initPoolSize}"></property>
+		<property name="maxPoolSize" value="${jdbc.maxPoolSize}"></property>
+		<property name="minPoolSize" value="${jdbc.minPoolSize}"></property>
+	</bean>
+	
+	<!-- <bean id="dataSource_odd" parent="dataSource_even" >
+		<property name="jdbcUrl" value="${jdbc.jdbcUrl2}"></property>
+	</bean>
+	
+	<bean id="surveyRouter" class="com.revolver.survey.router.SurveyRouter">
+		<property name="targetDataSources">
+			<map>
+				<entry key="even" value-ref="dataSource_even"/>
+				<entry key="odd" value-ref="dataSource_odd"/>
+			</map>
+		</property>
+		<property name="defaultTargetDataSource" ref="dataSource_even"/>
+	</bean> -->
+	
+	<bean id="sessionFactory" class="org.springframework.orm.hibernate4.LocalSessionFactoryBean">
+		<!-- 在Spring中配置C3P0数据源连接池，在Hibernate配置文件中，就不再配置连接数据库及C3P0的配置了 -->
+		<property name="dataSource" ref="dataSource_even"></property>
+		<property name="configLocation" value="classpath:hibernate.cfg.xml"></property>
+		<property name="mappingLocations" value="classpath:com/revolver/survey/*/entity/*.hbm.xml"></property>
+	</bean>
+
+	<!-- 配置事务管理器 -->
+	<bean id="transactionManager" class="org.springframework.orm.hibernate4.HibernateTransactionManager">
+		<property name="sessionFactory" ref="sessionFactory"></property>
+	</bean>
+	
+	<!-- 日志切面bean -->
+	<bean id="logAspect" class="com.revolver.survey.admin.advisory.LogAspect" autowire="byType"/>
+	<aop:config>
+		<aop:aspect ref="logAspect" >
+			<aop:pointcut expression="(execution(* *..*Service.update*(..)) ||
+									   execution(* *..*Service.save*(..)) ||
+									   execution(* *..*Service.move*(..)) ||
+									   execution(* *..*Service.remove*(..)) ||
+			        				   execution(* *..*Service.copy*(..)) ||
+			        				   execution(* *..*Service.batch*(..)) ||
+			        				   execution(* *..*Service.login*(..)) ||
+			        				   execution(* *..*Service.logout*(..)) ||
+			        				   execution(* *..*Service.parse*(..)) ||
+									   execution(* *..*Service.delete*(..)))
+									   and !bean(logServiceImpl)" id="logPointcut"/>
+			<aop:around method="record" pointcut-ref="logPointcut"/>	
+		</aop:aspect>
+	</aop:config>
+	
+	<!-- 配置石英 任务-->
+	<bean id="jobDetailBean" class="org.springframework.scheduling.quartz.JobDetailBean">
+		<property name="jobClass" value="com.revolver.survey.admin.scheduler.LogScheduler"/>
+		<property name="jobDataMap">
+			<map>
+				<entry key="logService" value-ref="logServiceImpl"/>
+			</map>
+		</property>
+	</bean>
+	
+	<!-- 配置触发器 -->
+	<bean id="cronTriggerBean" class="org.springframework.scheduling.quartz.CronTriggerBean">
+		<property name="jobDetail" ref="jobDetailBean"/>
+		<property name="cronExpression" value="0 0 0 15 * ?"/>
+	</bean>
+	
+	<!-- 配置启用石英任务的工厂bean -->
+	<bean id="schedulerFactoryBean" class="org.springframework.scheduling.quartz.SchedulerFactoryBean">
+		<property name="triggers">
+			<list>
+				<ref bean="cronTriggerBean"/>
+			</list>
+		</property>
+	</bean>
+	
+	<!-- 配置spring 监听器 -->
+	<bean id="logInitListener" class="com.revolver.survey.admin.listener.LogInitListener" autowire="byType"/>
+	
+
+	<!-- 配置缓存工厂bean -->
+	<!-- EhCache library setup -->
+	<bean id="ehcache" class="org.springframework.cache.ehcache.EhCacheManagerFactoryBean" 
+		p:config-location="classpath:ehcache.xml"/>
+
+	<!-- 配置缓存管理器bean -->
+	<bean id="cacheManager" class="org.springframework.cache.ehcache.EhCacheCacheManager" 
+		p:cache-manager-ref="ehcache"/>
+		
+	<bean id="surveyCacheKeyGenerate" class="com.revolver.survey.cache.SurveyCacheKeyGenerate"/>
+
+	<!-- cache definitions -->
+	<cache:advice id="cacheAdvice" key-generator="surveyCacheKeyGenerate" cache-manager="cacheManager" >
+	    <cache:caching cache="surveyCache">
+	        <cache:cacheable method="get*" />
+	        <cache:cacheable method="find*" />
+	        <cache:cache-evict method="save*" all-entries="true"/>
+	        <cache:cache-evict method="delete*" all-entries="true"/>
+	        <cache:cache-evict method="update*" all-entries="true"/>
+	        <cache:cache-evict method="remove*" all-entries="true"/>
+	        <cache:cache-evict method="remove*" all-entries="true"/>
+	        <cache:cache-evict method="move*" all-entries="true"/>
+	        <cache:cache-evict method="copy*" all-entries="true"/>
+	        
+	    </cache:caching>
+	</cache:advice>
+	
+	<!-- apply the cacheable behavior to all BookService interfaces -->
+	<aop:config>
+	    <aop:advisor advice-ref="cacheAdvice" pointcut="execution(* *..*Service.*(..))"/>
+	</aop:config>
+		
+	<!-- 开启基于注解的声明式事务功能 -->
+	<tx:annotation-driven />
+
+</beans>
